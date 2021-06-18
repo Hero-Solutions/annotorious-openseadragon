@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@babel/polyfill": "^7.10.4",
-    "@recogito/annotorious": "2.4.1",
+    "@recogito/annotorious": "https://github.com/Hero-Solutions/annotorious/tarball/condition-reports",
     "@recogito/recogito-client-core": "^1.2.3",
     "preact": "^10.5.13",
     "tiny-emitter": "^2.1.0"
