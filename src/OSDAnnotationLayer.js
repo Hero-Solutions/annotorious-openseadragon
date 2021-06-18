@@ -369,7 +369,8 @@ export default class OSDAnnotationLayer extends EventEmitter {
 
     if (!(readOnly || this.headless)) {
       // Replace the shape with an editable version
-      shape.parentNode.removeChild(shape);  
+      // We have to remove it through this kind of hackish workaround, otherwise touch input starts acting all weird (don't ask me why)
+      setTimeout(function() { shape.parentNode.removeChild(shape); }, 0);
 
       const toolForAnnotation = this.tools.forAnnotation(annotation);
       this.selectedShape = toolForAnnotation.createEditableShape(annotation);
