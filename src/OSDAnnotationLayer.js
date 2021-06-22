@@ -37,10 +37,10 @@ export default class OSDAnnotationLayer extends EventEmitter {
     this.viewer.addHandler('resize', () => this.resize());
     this.viewer.addHandler('flip', () => this.resize());
 
-    this.viewer.addHandler('open', () => { 
-      // Store image properties to environment
+    // Store image properties on open and after page change
+    this.viewer.addHandler('open',  () => {
       const { x, y } = this.viewer.world.getItemAt(0).source.dimensions;
-      
+
       props.env.image = {
         src: this.viewer.world.getItemAt(0).source['@id'] || 
           new URL(this.viewer.world.getItemAt(0).source.url, document.baseURI).href,
@@ -48,7 +48,15 @@ export default class OSDAnnotationLayer extends EventEmitter {
         naturalHeight: y
       };
 
-      this.resize();
+      this.resize();      
+    });
+
+    // Clear annotation layer on page change 
+    // Note: page change will also trigger 'open' - page size gets 
+    // updated automatically
+    this.viewer.addHandler('page', evt => {
+      this.init([]);
+      this.emit('pageChange');
     });
 
     this.selectedShape = null;
@@ -368,10 +376,6 @@ export default class OSDAnnotationLayer extends EventEmitter {
     const readOnly = this.readOnly || annotation.readOnly;
 
     if (!(readOnly || this.headless)) {
-      // Replace the shape with an editable version
-      // We have to remove it through this kind of hackish workaround, otherwise touch input starts acting all weird (don't ask me why)
-      setTimeout(function() { shape.parentNode.removeChild(shape); }, 0);
-
       const toolForAnnotation = this.tools.forAnnotation(annotation);
       this.selectedShape = toolForAnnotation.createEditableShape(annotation);
       this.selectedShape.scaleHandles(1 / this.currentScale());
@@ -399,6 +403,8 @@ export default class OSDAnnotationLayer extends EventEmitter {
 
       if (!skipEvent)
         this.emit('select', { annotation, element: this.selectedShape.element });
+
+      shape.parentNode.removeChild(shape);
     } else {
       this.selectedShape = shape;
 
