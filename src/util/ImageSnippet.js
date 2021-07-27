@@ -5,7 +5,7 @@ export const getSnippet = (viewer, element) => {
   // child (in case of editable shapes, the element would be 
   // the group with shape + handles)
   const shape = hasClass(element, '.a9s-annotation') ? 
-    element : element.querySelector('.a9s-annotation');
+    element : element.querySelectorAll('.a9s-annotation')[0];
 
   // Scale factor for OSD canvas element (physical vs. logical resolution)
   const { canvas } = viewer.drawer;

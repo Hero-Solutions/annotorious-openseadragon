@@ -18,7 +18,7 @@ export const renderPrecise = (shape, extent, scale) => {
 const renderRectFragment = (shape, extent, scale) => {
   const { x, y, w, h } = parseRectFragment(shape.annotation);
 
-  const outer = shape.querySelectorAll('.a9s-outer')[0];
+  const outer = shape.querySelector('.a9s-outer');
 
   const offsetX = scale * (x - extent.x);
   const offsetY = scale * (y - extent.y);
@@ -49,7 +49,7 @@ const renderPolygon = (screenShape, annotationShape, extent, scale) => {
       `${scale * (pt[0] - extent.x)},${scale * (pt[1] - extent.y)}`
     ).join(' ');
 
-  const outer = screenShape.querySelectorAll('.a9s-outer')[0];
+  const outer = screenShape.querySelector('.a9s-outer');
 
   outer.setAttribute('points', screenPoints);
 }

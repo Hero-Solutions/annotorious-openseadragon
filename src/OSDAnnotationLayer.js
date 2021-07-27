@@ -160,7 +160,11 @@ export default class OSDAnnotationLayer extends EventEmitter {
 
   addAnnotation = annotation => {
     const shape = drawShape(annotation);
-    shape.setAttribute('class', 'a9s-annotation');
+    if(annotation.target.styleClass) {
+      shape.setAttribute('class', 'a9s-annotation ' + annotation.target.styleClass);
+    } else {
+      shape.setAttribute('class', 'a9s-annotation');
+    }
 
     shape.setAttribute('data-id', annotation.id);
     shape.annotation = annotation;
