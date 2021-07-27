@@ -327,7 +327,9 @@ export default class OSDAnnotationLayer extends EventEmitter {
       if (this.selectedShape?.annotation === toRemove.annotation)
         this.deselect();
 
-      toRemove.mouseTracker.destroy();
+      if(toRemove.mouseTracker != null) {
+        toRemove.mouseTracker.destroy();
+      }
       toRemove.parentNode.removeChild(toRemove);
     }
   }
