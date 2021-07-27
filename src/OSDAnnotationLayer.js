@@ -1,7 +1,8 @@
 import EventEmitter from 'tiny-emitter';
 import OpenSeadragon from 'openseadragon';
-import { SVG_NAMESPACE } from '@recogito/annotorious/src/util/SVG';
+import { SVG_NAMESPACE, addClass } from '@recogito/annotorious/src/util/SVG';
 import DrawingTools from '@recogito/annotorious/src/tools/ToolsRegistry';
+import Crosshair from '@recogito/annotorious/src/Crosshair';
 import { drawShape, shapeArea } from '@recogito/annotorious/src/selectors';
 import { format } from '@recogito/annotorious/src/util/Formatting';
 import { isTouchDevice, enableTouchTranslation } from '@recogito/annotorious/src/util/Touch';
@@ -17,6 +18,8 @@ export default class OSDAnnotationLayer extends EventEmitter {
     this.readOnly = props.config.readOnly;
     this.headless = props.config.headless;
     this.formatter = props.config.formatter;
+
+    this.disableSelect = false;
 
     this.svg = document.createElementNS(SVG_NAMESPACE, 'svg');
 
@@ -37,8 +40,7 @@ export default class OSDAnnotationLayer extends EventEmitter {
     this.viewer.addHandler('resize', () => this.resize());
     this.viewer.addHandler('flip', () => this.resize());
 
-    // Store image properties on open and after page change
-    this.viewer.addHandler('open',  () => {
+    const onLoad = () => {
       const { x, y } = this.viewer.world.getItemAt(0).source.dimensions;
 
       props.env.image = {
@@ -48,16 +50,17 @@ export default class OSDAnnotationLayer extends EventEmitter {
         naturalHeight: y
       };
 
-      this.resize();      
-    });
+      if (props.config.crosshair) {
+        this.crosshair = new Crosshair(this.g, x, y);
+        addClass(this.svg, 'has-crosshair');
+      }
 
-    // Clear annotation layer on page change 
-    // Note: page change will also trigger 'open' - page size gets 
-    // updated automatically
-    this.viewer.addHandler('page', evt => {
-      this.init([]);
-      this.emit('pageChange');
-    });
+      this.resize();      
+    }
+
+    // Store image properties on open (incl. after page change) and on addTiledImage
+    this.viewer.addHandler('open', onLoad);
+    this.viewer.world.addHandler('add-item', onLoad);
 
     this.selectedShape = null;
 
@@ -101,21 +104,58 @@ export default class OSDAnnotationLayer extends EventEmitter {
     }).setTracking(false);
 
     this.tools.on('complete', shape => { 
-      this.mouseTracker.setTracking(false);
       this.selectShape(shape);
       this.emit('createSelection', shape.annotation);
+      this.mouseTracker.setTracking(false);
     });
 
     // Keep tracker disabled until Shift is held
     document.addEventListener('keydown', evt => {
-      if (evt.which === 16 && !this.selectedShape) // Shift
+      if (evt.which === 16 && !this.selectedShape) { // Shift
         this.mouseTracker.setTracking(!this.readOnly);
+      }
     });
 
     document.addEventListener('keyup', evt => {
-      if (evt.which === 16 && !this.tools.current.isDrawing)
+      if (evt.which === 16 && !this.tools.current.isDrawing) {
         this.mouseTracker.setTracking(false);
+      }
     });
+  }
+
+  _attachMouseListeners = (shape, annotation) => {
+    shape.addEventListener('mouseenter', () => {
+      this.viewer.gestureSettingsByDeviceType('mouse').clickToZoom = false;
+
+      if (!this.tools?.current.isDrawing)
+        this.emit('mouseEnterAnnotation', annotation, shape);
+    });
+
+    shape.addEventListener('mouseleave', () => {
+      this.viewer.gestureSettingsByDeviceType('mouse').clickToZoom = true;
+
+      if (!this.tools?.current.isDrawing)
+        this.emit('mouseLeaveAnnotation', annotation, shape);
+    });
+
+    // Common click/tap handler
+    const onClick = () => {
+      // Unfortunately, click also fires after drag, which means
+      // a new selection on top of this shape will be inerpreted 
+      // as click. Identify this case and pervent the default
+      // selection action!
+      const isSelection = this.selectedShape?.annotation.isSelection;
+      if (!isSelection) {
+        if (this.disableSelect) {
+          this.emit('clickAnnotation', shape.annotation, shape);
+        } else {
+          this.selectShape(shape)
+        }
+      }
+    }
+
+    shape.addEventListener('click', onClick);
+    shape.addEventListener('touchend', onClick);
   }
 
   addAnnotation = annotation => {
@@ -125,20 +165,7 @@ export default class OSDAnnotationLayer extends EventEmitter {
     shape.setAttribute('data-id', annotation.id);
     shape.annotation = annotation;
 
-    shape.addEventListener('mouseenter', evt => {
-      if (!this.tools?.current.isDrawing)
-        this.emit('mouseEnterAnnotation', annotation, evt);
-    });
-
-    shape.addEventListener('mouseleave', evt => {
-      if (!this.tools?.current.isDrawing)
-        this.emit('mouseLeaveAnnotation', annotation, evt);
-    });
-
-    shape.mouseTracker = new OpenSeadragon.MouseTracker({
-      element: shape,
-      clickHandler: () => this.selectShape(shape)
-    }).setTracking(true);
+    this._attachMouseListeners(shape, annotation);
 
     this.g.appendChild(shape);
 
@@ -151,7 +178,7 @@ export default class OSDAnnotationLayer extends EventEmitter {
     this.tools.registerTool(plugin);
 
   addOrUpdateAnnotation = (annotation, previous) => {
-    if (this.selectedShape?.annotation === annotation || this.selectShape?.annotation == previous)
+    if (this.selectedShape?.annotation === annotation || this.selectedShape?.annotation == previous)
       this.deselect();
   
     if (previous)
@@ -363,7 +390,10 @@ export default class OSDAnnotationLayer extends EventEmitter {
   }
 
   selectShape = (shape, skipEvent) => {
-    // Don't re-select
+    if (!skipEvent)
+      this.emit('clickAnnotation', shape.annotation, shape);
+  
+      // Don't re-select
     if (this.selectedShape?.annotation === shape?.annotation)
       return;
 
@@ -376,7 +406,16 @@ export default class OSDAnnotationLayer extends EventEmitter {
     const readOnly = this.readOnly || annotation.readOnly;
 
     if (!(readOnly || this.headless)) {
-      setTimeout(() => shape.parentNode.removeChild(shape), 1);
+      setTimeout(() => {
+        shape.parentNode.removeChild(shape);
+
+        // Fire the event AFTER the original shape was removed. Otherwise,
+        // people calling `.getAnnotations()` in the `onSelectAnnotation` 
+        // handler will receive a duplicate annotation
+        // (See issue https://github.com/recogito/annotorious-openseadragon/issues/63)
+        if (!skipEvent)
+          this.emit('select', { annotation, element: this.selectedShape.element });
+      }, 1);
 
       const toolForAnnotation = this.tools.forAnnotation(annotation);
       this.selectedShape = toolForAnnotation.createEditableShape(annotation);
@@ -384,7 +423,10 @@ export default class OSDAnnotationLayer extends EventEmitter {
 
       this.scaleFormatterElements(this.selectedShape.element);
 
-      this.selectedShape.element.annotation = annotation;        
+      this.selectedShape.element.annotation = annotation;     
+      this.selectedShape.element.addEventListener('click', () => {
+        this.emit('clickAnnotation', annotation, this.selectedShape.element)
+      });
 
       // Disable normal OSD nav
       const editableShapeMouseTracker = new OpenSeadragon.MouseTracker({
@@ -402,9 +444,6 @@ export default class OSDAnnotationLayer extends EventEmitter {
   
       this.selectedShape.on('update', fragment =>
         this.emit('updateTarget', this.selectedShape.element, fragment));
-
-      if (!skipEvent)
-        this.emit('select', { annotation, element: this.selectedShape.element });
     } else {
       this.selectedShape = shape;
 

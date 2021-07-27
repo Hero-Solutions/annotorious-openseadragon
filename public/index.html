@@ -72,7 +72,7 @@
         });
 
         var toolToggle = document.getElementById('current-tool');
-        toolToggle.addEventListener('click', function() {
+        toolToggle.addEventListener('click', function() {   
           if (toolToggle.innerHTML == 'TOOL: RECTANGLE') {
             toolToggle.innerHTML = 'TOOL: POLYGON';
             anno.setDrawingTool('polygon');
@@ -83,7 +83,7 @@
         });
 
         var modeBtn = document.getElementById('mode');
-        modeBtn.addEventListener('click', function() {             
+        modeBtn.addEventListener('click', function() {     
           if (modeBtn.innerHTML == 'MODE: VIEW') {
             modeBtn.innerHTML = 'MODE: ANNOTATE';
             anno.setDrawingEnabled(true);
@@ -94,27 +94,31 @@
         });
 
         anno.on('startSelection', function(a) {
-          console.log('start selection', a);
+          // console.log('start selection', a);
         });
 
         anno.on('createSelection', function(selection) {
           console.log('selection', selection);
         });
 
-        anno.on('selectAnnotation', function(annotation) {
-          console.log('selected', annotation);
+        anno.on('clickAnnotation', function(annotation, shape) {
+          console.log('clicked', annotation, shape);
+        });
+
+        anno.on('selectAnnotation', function(annotation, shape) {
+          console.log('selected', annotation, shape);
         });
 
         anno.on('cancelSelected', function(a) {
           console.log('cancelSelected', a);
         });
 
-        anno.on('mouseEnterAnnotation', function(annotation) {
-          // console.log('mouseEnter', annotation);
+        anno.on('mouseEnterAnnotation', function(annotation, shape) {
+          // console.log('mouseEnter', shape);
         });
 
-        anno.on('mouseLeaveAnnotation', function(annotation) {
-          // console.log('mouseLeave', annotation);
+        anno.on('mouseLeaveAnnotation', function(annotation, shape) {
+          // console.log('mouseLeave', shape);
         });
 
         anno.loadAnnotations('annotations.w3c.json');

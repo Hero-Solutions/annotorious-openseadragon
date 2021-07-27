@@ -15,6 +15,9 @@ export default class OpenSeadragonAnnotator extends Component {
     // Headless mode
     editorDisabled: this.props.config.disableEditor,
 
+    // Widgets
+    widgets: this.props.config.widgets,
+
     // Records the state before any potential headless modify (done via
     // .updateSelected) so we can properly fire the updateAnnotation(a, previous)
     // event, and distinguish between headless Save and Cancel 
@@ -38,13 +41,19 @@ export default class OpenSeadragonAnnotator extends Component {
     this.annotationLayer.on('updateTarget', this.handleUpdateTarget);
 
     this.annotationLayer.on('viewportChange', this.handleViewportChange);
-    this.annotationLayer.on('pageChange', this.handlePageChange);
 
-    this.annotationLayer.on('mouseEnterAnnotation', this.handleMouseEnter);
-    this.annotationLayer.on('mouseLeaveAnnotation', this.handleMouseLeave);
+    this.forwardEvent('mouseEnterAnnotation', 'onMouseEnterAnnotation');
+    this.forwardEvent('mouseLeaveAnnotation', 'onMouseLeaveAnnotation');
+    this.forwardEvent('clickAnnotation','onClickAnnotation');
     
     // Escape cancels editing
     document.addEventListener('keyup', this.escapeKeyCancel);
+  }
+
+  forwardEvent = (from, to) => {
+    this.annotationLayer.on(from, (annotation, elem) => {
+      this.props[to](annotation.clone(), elem);
+    });
   }
 
   componentWillUnmount() {
@@ -66,9 +75,9 @@ export default class OpenSeadragonAnnotator extends Component {
   handleStartSelect = pt =>
     this.props.onSelectionStarted(pt);
     
-  handleSelect = evt => {
+  handleSelect = (evt, skipEvent) => {
     this.state.editorDisabled ?
-      this.onHeadlessSelect(evt) : this.onNormalSelect(evt);
+      this.onHeadlessSelect(evt, skipEvent) : this.onNormalSelect(evt, skipEvent);
   }
 
   onNormalSelect = (evt, skipEvent) => {
@@ -89,7 +98,7 @@ export default class OpenSeadragonAnnotator extends Component {
             if (annotation.isSelection) {
               this.props.onSelectionCreated(annotation.clone());
             } else {
-              this.props.onAnnotationSelected(annotation.clone());
+              this.props.onAnnotationSelected(annotation.clone(), element);
             }
           }
         });  
@@ -118,12 +127,12 @@ export default class OpenSeadragonAnnotator extends Component {
     }
   }
 
-  onHeadlessSelect = evt => {
+  onHeadlessSelect = (evt, skipEvent) => {
     // When in headless mode, changing selection acts as 'Ok' - changes
     // to the previous annotation are stored! (In normal mode, selection
     // acts as 'Cancel'.)
     this.saveSelected().then(() =>  {
-      this.onNormalSelect(evt);
+      this.onNormalSelect(evt, skipEvent);
 
       const { annotation } = evt;
 
@@ -141,17 +150,8 @@ export default class OpenSeadragonAnnotator extends Component {
     this.props.onSelectionTargetChanged(clone);
   }
 
-  handleMouseEnter = annotation =>
-    this.props.onMouseEnterAnnotation(annotation.clone());
-
-  handleMouseLeave = annotation =>
-    this.props.onMouseLeaveAnnotation(annotation.clone());
-
   handleViewportChange = selectedDOMElement =>
     this.setState({ selectedDOMElement });
-
-  handlePageChange = () =>
-    this.clearState();
 
   /**
    * A convenience method that allows the external application to
@@ -243,6 +243,19 @@ export default class OpenSeadragonAnnotator extends Component {
         document.removeEventListener('keyup', this.escapeKeyCancel);
     });
   }
+
+  get disableSelect() {
+    return this.annotationLayer.disableSelect;
+  }
+
+  set disableSelect(disable) {   
+    this.annotationLayer.disableSelect = disable;
+
+    if (disable) {
+      this.annotationLayer.deselect();
+      this.clearState();
+    }
+  }
   
   fitBounds = (annotationOrId, immediately) =>
     this.annotationLayer.fitBounds(annotationOrId, immediately);
@@ -311,7 +324,7 @@ export default class OpenSeadragonAnnotator extends Component {
     const selected = this.annotationLayer.selectAnnotation(arg, true);
     
     if (selected) { 
-      this.handleSelect(selected);
+      this.handleSelect(selected, true);
       return selected.annotation.clone();
     } else {
       this.clearState(); // Deselect
@@ -333,6 +346,9 @@ export default class OpenSeadragonAnnotator extends Component {
     if (!visible)
       this.clearState();
   }
+
+  setWidgets = widgets =>
+    this.setState({ widgets });
 
   updateSelected = (annotation, saveImmediately) =>
     new Promise(resolve => {
@@ -366,7 +382,7 @@ export default class OpenSeadragonAnnotator extends Component {
           selectedElement={this.state.selectedDOMElement}
           readOnly={readOnly}
           allowEmpty={this.props.config.allowEmpty}
-          widgets={this.props.config.widgets}
+          widgets={this.state.widgets}
           env={this.props.env}
           onAnnotationCreated={this.onCreateOrUpdateAnnotation('onAnnotationCreated')}
           onAnnotationUpdated={this.onCreateOrUpdateAnnotation('onAnnotationUpdated')}

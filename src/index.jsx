@@ -5,13 +5,9 @@ import OpenSeadragonAnnotator from './OpenSeadragonAnnotator';
 import { 
   Selection,
   WebAnnotation,
-  addPolyfills, 
   createEnvironment,
-  setLocale 
+  setLocale
 } from '@recogito/recogito-client-core';
-
-import '@babel/polyfill';
-addPolyfills(); // Some extra polyfills that babel doesn't include
 
 import '@recogito/annotorious/src/ImageAnnotator.scss';
 import '@recogito/recogito-client-core/themes/default';
@@ -56,6 +52,7 @@ class OSDAnnotorious {
         onAnnotationUpdated={this.handleAnnotationUpdated} 
         onAnnotationDeleted={this.handleAnnotationDeleted}
         onCancelSelected={this.handleCancelSelected}
+        onClickAnnotation={this.handleClickAnnotation}
         onMouseEnterAnnotation={this.handleMouseEnterAnnotation}
         onMouseLeaveAnnotation={this.handleMouseLeaveAnnotation} />, this.appContainerEl);
   }
@@ -70,14 +67,17 @@ class OSDAnnotorious {
   handleAnnotationDeleted = annotation =>
     this._emitter.emit('deleteAnnotation', annotation.underlying);
 
-  handleAnnotationSelected = annotation => 
-    this._emitter.emit('selectAnnotation', annotation.underlying);
+  handleAnnotationSelected = (annotation, elem) => 
+    this._emitter.emit('selectAnnotation', annotation.underlying, elem);
 
   handleAnnotationUpdated = (annotation, previous) =>
     this._emitter.emit('updateAnnotation', annotation.underlying, previous.underlying);
 
   handleCancelSelected = annotation =>
     this._emitter.emit('cancelSelected', annotation.underlying);
+
+  handleClickAnnotation = (annotation, elem) =>
+    this._emitter.emit('clickAnnotation', annotation.underlying, elem);
   
   handleSelectionCreated = selection =>
     this._emitter.emit('createSelection', selection.underlying);
@@ -88,11 +88,11 @@ class OSDAnnotorious {
   handleSelectionTargetChanged = target =>
     this._emitter.emit('changeSelectionTarget', target);
 
-  handleMouseEnterAnnotation = (annotation, evt) =>
-    this._emitter.emit('mouseEnterAnnotation', annotation.underlying, evt);
+  handleMouseEnterAnnotation = (annotation, elem) =>
+    this._emitter.emit('mouseEnterAnnotation', annotation.underlying, elem);
 
-  handleMouseLeaveAnnotation = (annotation, evt) =>
-    this._emitter.emit('mouseLeaveAnnotation', annotation.underlying, evt);
+  handleMouseLeaveAnnotation = (annotation, elem) =>
+    this._emitter.emit('mouseLeaveAnnotation', annotation.underlying, elem);
 
   /********************/               
   /*  External API    */
@@ -123,6 +123,14 @@ class OSDAnnotorious {
 
   set disableEditor(disabled) {
     this._app.current.disableEditor = disabled;
+  }
+
+  get disableSelect() {
+    return this._app.current.disableSelect;
+  }
+
+  set disableSelect(select) {
+    this._app.current.disableSelect = select;
   }
   
   destroy = () =>
@@ -158,6 +166,9 @@ class OSDAnnotorious {
 
   on = (event, handler) =>
     this._emitter.on(event, handler);
+
+  once = (event, handler) =>
+    this._emitter.once(event, handler);
 
   panTo = (annotationOrId, immediately) =>
     this._app.current.panTo(this._wrap(annotationOrId), immediately);
@@ -198,6 +209,9 @@ class OSDAnnotorious {
 
   setVisible = visible =>
     this._app.current.setVisible(visible); 
+
+  setWidgets = widgets =>
+    this._app.current.setWidgets(widgets);
 
   setServerTime = timestamp => 
     this._env.setServerTime(timestamp);
