@@ -173,6 +173,37 @@ export default class OSDAnnotationLayer extends EventEmitter {
 
     this.g.appendChild(shape);
 
+    if (typeof window.annoIds !== undefined && typeof window.annoIds[annotation.id] !== undefined) {
+      var number = window.annoIds[annotation.id];
+      var bbox = shape.getBBox();
+      var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      var add = 100;
+      if(number >= 10000) {
+        add += 100;
+      }
+      if(number >= 1000) {
+        add += 100;
+      }
+      if(number >= 100) {
+        add += 100;
+      }
+      if(number >= 10) {
+        add += 100;
+      }
+      text.setAttributeNS(null, 'x', bbox.x - 50 - add);
+      text.setAttributeNS(null, 'y', bbox.y + 170);
+
+      if (annotation.target.styleClass) {
+        text.setAttributeNS(null, 'class', 'annotation-number ' + annotation.target.styleClass);
+      } else {
+        text.setAttributeNS(null, 'class', 'annotation-number');
+      }
+
+      var textNode = document.createTextNode(number);
+      text.appendChild(textNode);
+      shape.appendChild(text);
+    }
+
     format(shape, annotation, this.formatter);
 
     this.scaleFormatterElements(shape);
