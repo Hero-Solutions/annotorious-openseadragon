@@ -413,8 +413,8 @@ export default class OSDAnnotationLayer extends EventEmitter {
 
     if (!(readOnly || this.headless)) {
 
-      if(annotation.underlying.body.length == 0 && config.hasOwnProperty('damageType') && config.damageType != '') {
-        annotation.underlying.body.push({ 'type': 'TextualBody', 'value': config.damageType });
+      if(annotation.underlying.body.length == 0 && props.config.hasOwnProperty('damageType') && props.config.damageType != '') {
+        annotation.underlying.body.push({ 'type': 'TextualBody', 'value': props.config.damageType });
       }
 
       setTimeout(() => {
