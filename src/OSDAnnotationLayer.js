@@ -412,6 +412,11 @@ export default class OSDAnnotationLayer extends EventEmitter {
     const readOnly = this.readOnly || annotation.readOnly;
 
     if (!(readOnly || this.headless)) {
+
+      if(annotation.underlying.body.length == 0 && config.hasOwnProperty('damageType') && config.damageType != '') {
+        annotation.underlying.body.push({ 'type': 'TextualBody', 'value': config.damageType });
+      }
+
       setTimeout(() => {
         shape.parentNode.removeChild(shape);
 
